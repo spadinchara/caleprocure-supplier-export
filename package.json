@@ -1,0 +1,14 @@
+{
+  "name": "caleprocure-supplier-export",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Downloads the Cal eProcure certified small business / DVBE supplier list",
+  "main": "export-suppliers.js",
+  "scripts": {
+    "export": "node export-suppliers.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "playwright": "^1.56.1"
+  }
+}

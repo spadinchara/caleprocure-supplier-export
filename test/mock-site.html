@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><title>Mock supplier search</title>
+<style>#loading{position:fixed;inset:0;display:none;background:#0003}#loading div{background:#fff;padding:40px;width:200px;margin:200px auto}#modal{display:none}</style>
+</head><body>
+<h1>Search Criteria</h1>
+<input id="bizName"> <button type="button" id="clear">Clear Criteria</button> <button type="button" id="search">Search</button>
+<section id="results" hidden>
+  <h2>SEARCH RESULTS</h2>
+  <span>1-10 of 22189</span> <a href="#" id="download"><i class="icon"></i> Download</a>
+</section>
+<div id="loading"><div>Loading...</div></div>
+<div id="modal"><p>Your file is ready.</p><button type="button" id="attach">Download Attachment</button><button type="button">Close</button></div>
+<script>
+const delay = Number(new URLSearchParams(location.search).get('delay') || 1500);
+const show = (id, on) => document.getElementById(id).style.display = on ? 'block' : 'none';
+document.getElementById('search').onclick = () => {
+  show('loading', true);
+  setTimeout(() => { show('loading', false); document.getElementById('results').hidden = false; }, delay);
+};
+document.getElementById('download').onclick = (e) => {
+  e.preventDefault(); show('loading', true);
+  setTimeout(() => { show('loading', false); show('modal', true); }, delay);
+};
+document.getElementById('attach').onclick = () => { location.href = '/file'; };
+</script></body></html>

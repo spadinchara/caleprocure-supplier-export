@@ -13,7 +13,9 @@
 <script>
 const delay = Number(new URLSearchParams(location.search).get('delay') || 1500);
 const show = (id, on) => document.getElementById(id).style.display = on ? 'block' : 'none';
+const mode = new URLSearchParams(location.search).get('mode') || 'attachment';
 document.getElementById('search').onclick = () => {
+  document.cookie = 'ce_session=1; path=/';
   show('loading', true);
   setTimeout(() => { show('loading', false); document.getElementById('results').hidden = false; }, delay);
 };
@@ -21,6 +23,7 @@ document.getElementById('download').onclick = (e) => {
   e.preventDefault(); show('loading', true);
   setTimeout(() => { show('loading', false); show('modal', true); }, delay);
 };
-// Like the live site appears to, deliver the file through a popup window.
-document.getElementById('attach').onclick = () => { window.open('/file', '_blank'); };
+// Like the live site, open the file in a new tab. mode=inline serves it for display rather
+// than as a download, and the server only returns it with the session cookie.
+document.getElementById('attach').onclick = () => { window.open('/files/Certification_Information_TEST.xls?mode=' + mode, '_blank'); };
 </script></body></html>

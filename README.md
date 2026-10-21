@@ -17,6 +17,10 @@ It follows the same steps as a person, in a hidden Edge window:
 5. Clicks **Download Attachment** in the "Your file is ready." modal.
 6. Saves the file under the server's default name (what the Save As dialog would offer).
 
+   Cal eProcure opens the file (`Certification_Information_<timestamp>.xls`) in a new tab, and
+   Edge may display it there instead of downloading it. If no download starts within 10 seconds,
+   the script downloads that tab's address directly with the browser's session cookies.
+
 Each wait looks for the overlay to clear or the next button to appear, not a fixed delay. If any
 step fails, the whole run is retried in a fresh browser. The browser uses its own temporary
 profile, so it doesn't touch your normal Edge windows, bookmarks or sign-ins.

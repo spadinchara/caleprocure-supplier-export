@@ -70,6 +70,7 @@ function Connect-Cdp([string]$WsUrl) {
     $script:RecvTask = $null
     $script:Download = $null
     $script:TabUrls = @{}
+    $script:PopupUrl = $null
     $script:Ws.ConnectAsync([Uri]$WsUrl, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
 }
 
@@ -117,6 +118,8 @@ function Receive-CdpEvent($Message) {
             if ($info.type -eq 'page' -and $info.targetId -ne $script:TargetId -and $info.url -and $info.url -ne 'about:blank' -and
                 $script:TabUrls[$info.targetId] -ne $info.url) {
                 $script:TabUrls[$info.targetId] = $info.url
+                $script:PopupUrl = $info.url
+                $script:PopupSeenAt = Get-Date
                 Write-Log "Other tab is at: $($info.url)"
             }
         }
@@ -294,12 +297,17 @@ function Wait-ForDownload([string]$Dir) {
     # Chrome writes *.crdownload until the transfer completes, then renames it.
     # Accept the file once no partial remains and its size is unchanged across two checks.
     # The browser's own download events, when it sends them, settle it sooner.
+    # Cal eProcure opens the file in a new tab, and Edge may display it there instead of
+    # downloading it. If no download starts soon after that tab opens, fetch its address directly.
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $lastSize = -1
     while ((Get-Date) -lt $deadline) {
         Watch-CdpEvents 1000
         if ($script:Download -and $script:Download.State -eq 'canceled') {
             throw "The browser canceled the download of $($script:Download.Name)"
+        }
+        if (-not $script:Download -and $script:PopupUrl -and ((Get-Date) - $script:PopupSeenAt).TotalSeconds -ge 10) {
+            return Save-FileDirectly $script:PopupUrl $Dir
         }
         $partial = Get-ChildItem -Path $Dir -File -Filter '*.crdownload'
         $file = Get-ChildItem -Path $Dir -File |
@@ -315,6 +323,40 @@ function Wait-ForDownload([string]$Dir) {
         throw "No download started within $TimeoutSeconds s of clicking 'Download Attachment'"
     }
     throw "Timed out after $TimeoutSeconds s waiting for $($script:Download.Name) to finish downloading"
+}
+
+# Downloads $FileUrl with the browser's cookies, so the request belongs to the same site session.
+function Save-FileDirectly([string]$FileUrl, [string]$Dir) {
+    Write-Log 'No download started from the new tab; fetching its address directly'
+    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    $session.UserAgent = $script:UserAgent
+    try { $cookies = (Invoke-Cdp 'Storage.getCookies').cookies }
+    catch { $cookies = (Invoke-Cdp 'Network.getAllCookies' -SessionId $script:Session).cookies }
+    foreach ($c in $cookies) {
+        try { $session.Cookies.Add((New-Object System.Net.Cookie($c.name, $c.value, $c.path, $c.domain))) } catch { }
+    }
+
+    $part = Join-Path $Dir 'download.part'
+    # Windows PowerShell's progress bar slows large downloads dramatically.
+    $savedPreference = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        $response = Invoke-WebRequest -Uri $FileUrl -WebSession $session -Headers @{ Referer = $Url } `
+            -OutFile $part -PassThru -UseBasicParsing -TimeoutSec $TimeoutSeconds
+    }
+    finally { $ProgressPreference = $savedPreference }
+
+    # Same name a browser would use: Content-Disposition if given, else the URL's last segment.
+    $name = $null
+    $disposition = "$($response.Headers['Content-Disposition'])"
+    if ($disposition -match 'filename="?([^";]+)"?') { $name = $matches[1] }
+    if (-not $name) { $name = [Uri]::UnescapeDataString(([Uri]$FileUrl).Segments[-1]) }
+    foreach ($ch in [IO.Path]::GetInvalidFileNameChars()) { $name = $name.Replace([string]$ch, '_') }
+
+    $file = Join-Path $Dir $name
+    Move-Item -Path $part -Destination $file -Force
+    Write-Log ("Fetched {0} ({1})" -f $name, "$($response.Headers['Content-Type'])")
+    return Get-Item $file
 }
 
 # Records what the browser was showing when a run failed: a screenshot of each open tab,
@@ -386,8 +428,8 @@ function Invoke-Export {
         $script:Session = (Invoke-Cdp 'Target.attachToTarget' @{ targetId = $target.targetId; flatten = $true }).sessionId
 
         # Headless browsers advertise "HeadlessChrome"; present a normal user agent instead.
-        $ua = (Invoke-Cdp 'Browser.getVersion').userAgent -replace 'HeadlessChrome', 'Chrome'
-        Invoke-Cdp 'Network.setUserAgentOverride' @{ userAgent = $ua } -SessionId $script:Session | Out-Null
+        $script:UserAgent = (Invoke-Cdp 'Browser.getVersion').userAgent -replace 'HeadlessChrome', 'Chrome'
+        Invoke-Cdp 'Network.setUserAgentOverride' @{ userAgent = $script:UserAgent } -SessionId $script:Session | Out-Null
 
         Write-Log "Opening $Url"
         Invoke-Cdp 'Page.navigate' @{ url = $Url } -SessionId $script:Session | Out-Null

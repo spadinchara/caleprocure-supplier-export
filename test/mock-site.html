@@ -21,5 +21,6 @@ document.getElementById('download').onclick = (e) => {
   e.preventDefault(); show('loading', true);
   setTimeout(() => { show('loading', false); show('modal', true); }, delay);
 };
-document.getElementById('attach').onclick = () => { location.href = '/file'; };
+// Like the live site appears to, deliver the file through a popup window.
+document.getElementById('attach').onclick = () => { window.open('/file', '_blank'); };
 </script></body></html>

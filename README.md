@@ -55,6 +55,13 @@ exits with code 0 on success and 1 if every attempt fails.
 `-ExecutionPolicy Bypass` applies only to this one run. If your organization blocks it, ask IT
 to allow or sign the script. Running it with `-File` from a shell they approve also works.
 
+## If a run fails
+
+`downloads\export.log` records each step. It also logs any tab the site opens, and when Edge
+starts and finishes the download. When a run fails, the script saves a screenshot of each open
+tab as `downloads\failure-<time>-tab<n>.png` and logs what was left in the download folder.
+Send those to whoever maintains the script.
+
 ## Schedule it (Windows Task Scheduler)
 
 Run this once in PowerShell to create a daily 6:00 AM job (change the paths and time as needed):
